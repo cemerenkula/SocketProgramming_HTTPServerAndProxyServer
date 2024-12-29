@@ -2,6 +2,7 @@ import socket
 import threading
 import argparse
 import os
+import time
 
 def parse_request(request):
     valid_methods = {"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "TRACE", "CONNECT"}
@@ -32,7 +33,7 @@ def parse_request(request):
             return 200, "Favicon request"
         return 400, "Bad Request"
 
-def generate_response(status_code, content=None):
+def generate_response(status_code, content=None, response_id=1):
     if status_code == 200:
         body = f"<HTML><HEAD><TITLE>Response</TITLE></HEAD><BODY>{'O' * (content - 62)}</BODY></HTML>"
         headers = (
@@ -43,29 +44,42 @@ def generate_response(status_code, content=None):
         response = headers + body
     elif status_code == 400:
         response = "HTTP/1.0 400 Bad Request\r\n\r\nBad Request"
+        body = "Bad Request"
     elif status_code == 501:
         response = "HTTP/1.0 501 Not Implemented\r\n\r\nNot Implemented"
+        body = "Not Implemented"
     
-    # Save the response to a file in the Responses folder
+    # Save the response to a new HTML file in the Responses folder
     os.makedirs("Responses", exist_ok=True)
-    with open(os.path.join("Responses", "response.txt"), "w") as file:
-        file.write(response)
+    filename = f"response_{response_id}.html"
+    with open(os.path.join("Responses", filename), "w") as file:
+        file.write(body)
     
     return response
-    
-
 
 # Function to handle client requests
-def handle_client(client_socket):
+def handle_client(client_socket, response_counter):
+    global counter_lock
     try:
-        request = client_socket.recv(1024).decode('utf-8')
+        request = client_socket.recv(32768).decode('utf-8')
         print(f"Request received:\n{request}")
+
+        # Ignore favicon.ico requests
+        if "favicon.ico" in request:
+            print("Ignoring favicon.ico request")
+            client_socket.close()
+            return
 
         # HTTP Response message
         parsed_URI = parse_request(request)
         print(f"Parsed request - Status code: {parsed_URI[0]}, Content: {parsed_URI[1]}")
         
-        response = generate_response(parsed_URI[0], parsed_URI[1])
+        # Increment counter for valid requests
+        with counter_lock:
+            response_id = response_counter[0]
+            response_counter[0] += 1
+        
+        response = generate_response(parsed_URI[0], parsed_URI[1], response_id)
         print(f"Generated response: {response}")  # Print the response before sending
         
         raw_response = response.encode('utf-8')
@@ -77,6 +91,8 @@ def handle_client(client_socket):
     finally:
         client_socket.close()
 
+
+
 # Main function to start the server
 def start_server(port):
     # Create a socket to listen for incoming connections
@@ -86,13 +102,18 @@ def start_server(port):
     server_socket.listen(100)
     print(f"Server started on 127.0.0.1:{port}")
 
+    response_counter = [1]  # Shared counter
+    global counter_lock
+    counter_lock = threading.Lock()
+
     # Handle incoming connections with threading
     while True:
         client_socket, client_address = server_socket.accept()
         print(f"Connection from {client_address}")
         
         # Create a new thread to handle the client
-        client_handler = threading.Thread(target=handle_client, args=(client_socket,))
+        client_handler = threading.Thread(target=handle_client, args=(client_socket, response_counter))
+        client_handler.daemon = True
         client_handler.start()
 
 if __name__ == "__main__":
