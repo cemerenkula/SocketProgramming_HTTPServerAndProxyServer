@@ -2,7 +2,8 @@ import socket
 import threading
 import argparse
 import os
-import time
+
+CREATE_FILE = False
 
 def parse_request(request):
     valid_methods = {"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "TRACE", "CONNECT"}
@@ -50,10 +51,11 @@ def generate_response(status_code, content=None, response_id=1):
         body = "Not Implemented"
     
     # Save the response to a new HTML file in the Responses folder
-    os.makedirs("Responses", exist_ok=True)
-    filename = f"response_{response_id}.html"
-    with open(os.path.join("Responses", filename), "w") as file:
-        file.write(body)
+    if (CREATE_FILE == True):
+        os.makedirs("Responses", exist_ok=True)
+        filename = f"response_{response_id}.html"
+        with open(os.path.join("Responses", filename), "w") as file:
+            file.write(body)
     
     return response
 
