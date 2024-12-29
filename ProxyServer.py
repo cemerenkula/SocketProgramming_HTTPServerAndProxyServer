@@ -1,6 +1,5 @@
 import socket
 import threading
-import re
 
 PROXY_HOST = '127.0.0.1'
 PORT = 8888
@@ -22,13 +21,24 @@ def handle_client(client_socket, client_address):
         return
 
     if uri.startswith("http://"):
-        match = re.match(r"http://([^/]+)(.*)", uri)
-        host_port, relative_path = match.groups()
-        host, _, port = host_port.partition(":")
-        port = port or WEB_SERVER_PORT
+    # Remove the "http://" prefix and split the rest by "/", getting the first part as host_port
+        uri_without_scheme = uri[7:]  # Remove "http://"
+        parts = uri_without_scheme.split('/', 1)
+        host_port = parts[0]
+        relative_path = '/' + parts[1] if len(parts) > 1 else '/'
+
+        # Now split host_port by ":" to separate host and port
+        if ':' in host_port:
+            host, port = host_port.split(':', 1)
+            port = int(port)  # Convert port to integer
+        else:
+            host = host_port
+            port = WEB_SERVER_PORT  # Default port if not specified
+
     else:
         host = None
         port = None
+
 
     port = int(port) if port else None
 
