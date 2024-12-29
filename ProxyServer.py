@@ -8,12 +8,14 @@ WEB_SERVER_PORT = 8080
 ALLOWED_HOST = 'localhost'
 ALLOWED_PORT = 8080
 
+# Function to handle client requests
 def handle_client(client_socket, client_address):
     request = client_socket.recv(32768).decode('utf-8')
     parts = request.split("\r\n", 1)
     request_line = parts[0]
     headers = parts[1] if len(parts) > 1 else ""
 
+    # Extract the method, URI, and HTTP version from the request line
     try:
         method, uri, http_version = request_line.split()
     except ValueError:
@@ -42,6 +44,7 @@ def handle_client(client_socket, client_address):
 
     port = int(port) if port else None
 
+    # Check if the request is allowed
     if host == ALLOWED_HOST and port == ALLOWED_PORT:
         print(f"Proxy: Connection from {client_address}")
         print(f"Proxy: Allowed request received:\n{request}")
@@ -50,6 +53,7 @@ def handle_client(client_socket, client_address):
         host_header = f"Host: {host}:{port}\r\n"
         new_request = new_request_line + "\r\n" + host_header + headers
 
+        # Forward the request to the web server
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as web_socket:
                 web_socket.connect((host, port))
@@ -84,6 +88,7 @@ def start_proxy_server(host, port):
     proxy_socket.listen(100)
     print(f"Proxy server started on {host}:{port}")
 
+    # Handle incoming connections with threading
     while True:
         client_socket, client_address = proxy_socket.accept()
         client_handler = threading.Thread(target=handle_client, args=(client_socket, client_address))
